@@ -21,8 +21,23 @@ def _gather(input):
     if world_size == 1:
         return input
 
-    last_dim_idx = input.ndim - 1
-    rank = get_model_parallel_rank()
+    # last_dim_idx = input.ndim - 1
+    # rank = get_model_parallel_rank()
+
+    input_list = [torch.empty_like(input) for _ in range(world_size)]
+
+    # TODO: add
+    # tensor_list[rank] = input_
+
+    torch.distributed.all_gather(
+        input_list,
+        input,
+        group=get_model_parallel_group()
+    )
+
+    output = torch.cat(input_list, dim=-1)
+
+    return output
 
 
 class _CopyToModelParallelRegion(torch.autograd.Function):
@@ -38,7 +53,11 @@ class _CopyToModelParallelRegion(torch.autograd.Function):
 class _GatherFromModelParallelRegion(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
-        return input
+        return _gather(input)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        pass
 
 
 def copy_to_model_parallel_region(input):

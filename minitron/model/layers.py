@@ -3,7 +3,10 @@ from torch import nn
 import torch.nn.functional as F
 
 from .utils import get_model_parallel_world_size
-from .mappings import copy_to_model_parallel_region
+from .mappings import (
+    copy_to_model_parallel_region,
+    gather_from_model_parallel_region
+)
 
 
 class ColumnParallelLinear(nn.Module):

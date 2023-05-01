@@ -1,6 +1,7 @@
-from typing import Callable, Optional
+from typing import Callable, Optional, List, Dict, Tuple
 from queue import Queue
 import sys
+from contextlib import contextmanager
 
 import torch
 
@@ -64,3 +65,19 @@ def worker(
 
         done = (False, None)
         out_queue.put(done)
+
+
+@contextmanager
+def spawn_workers(
+    devices: List[torch.device]
+):
+    in_queues: List[InQueue] = []
+    output_queues: List[OutQueue] = []
+
+    workers: Dict[torch.device, Tuple[InQueue, OutQueue]] = {}
+
+    for device in devices:
+        try:
+            in_queue, out_queue = workers[device]
+        except KeyError:
+            pass
