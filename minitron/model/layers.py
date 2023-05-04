@@ -64,3 +64,46 @@ class RowParallelLinear(nn.Module):
         torch.distributed.all_reduce(output_parallel)
 
         return output_parallel
+
+
+class VocabParallelEmbedding(nn.Module):
+    def __init__(self, num_embeddings, embedding_dim):
+        super().__init__()
+        self.num_embeddings = num_embeddings
+        self.embedding_dim = embedding_dim
+
+        rank = torch.distributed.get_rank()
+        world_size = torch.distributed.get_world_size()
+        self.vocab_start_idx, self.vocab_end_idx = self.extract_range(
+            self.num_embeddings,
+            rank,
+            world_size
+        )
+        self.num_embedding_per_patrition = self.vocab_end_idx - self.vocab_start_idx
+
+        self.weight = nn.Parameter(torch.empty(
+            self.num_embedding_per_patrition,
+            self.embedding_dim
+        ))
+
+    def extract_range(self, num_embeddings, rank, world_size):
+        per_patrition_vocab_size = num_embeddings // world_size
+        start_idx = rank * per_patrition_vocab_size
+        end_idx = start_idx + per_patrition_vocab_size
+        return start_idx, end_idx
+
+    def forward(self, input):
+        input_mask = (input < self.vocab_start_idx) | (input >= self.vocab_end_idx)
+        masked_input = input.clone() - self.vocab_start_idx
+        masked_input[input_mask] = 0
+
+        output_parallel = F.embedding(masked_input, self.weight)
+        masked_idxs = torch.where(input_mask == True)[1]
+        output_parallel[:, masked_idxs, :] = 0.
+
+        torch.distributed.all_reduce(
+            output_parallel,
+            op=torch.distributed.ReduceOp.SUM
+        )
+
+        return output_parallel
