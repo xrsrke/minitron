@@ -107,7 +107,6 @@ class RowParallelLinear(nn.Module):
         self.bias = nn.Parameter(torch.randn(output_size))
 
     def forward(self, input):
-        dist.barrier()
         input_parallel = Scatter.apply(input)
         output_parallel = F.linear(input_parallel, self.weight)
         outputs = Reduce.apply(output_parallel)
