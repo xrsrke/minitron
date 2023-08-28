@@ -1,5 +1,4 @@
 import os
-from copy import deepcopy
 
 import torch
 from torch import nn
@@ -186,8 +185,8 @@ def test_parallel_mlp():
             # Because PyTorch does not support sending tensors
             # that require gradients through inter-process communication
             # we need to detach them from the computational graph
-            inputs, deepcopy(weights), deepcopy(biases), outputs.detach(),
-            deepcopy(weight_grads), deepcopy(bias_grads)
+            inputs, weights, biases, outputs.detach(),
+            weight_grads, bias_grads
         ))
         processes.append(p)
         p.start()
