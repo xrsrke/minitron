@@ -12,9 +12,9 @@ class Broadcast(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        torch.distributed.all_reduce(
+        dist.all_reduce(
             grad_output,
-            op=torch.distributed.ReduceOp.SUM
+            op=dist.ReduceOp.SUM
         )
         return grad_output
 
@@ -22,7 +22,7 @@ class Broadcast(torch.autograd.Function):
 class Gather(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
-        world_size = torch.distributed.get_world_size()
+        world_size = dist.get_world_size()
         inputs = [torch.empty_like(input) for _ in range(world_size)]
         dist.all_gather(inputs, input)
         inputs = torch.cat(inputs, dim=-1)
@@ -30,8 +30,8 @@ class Gather(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        rank = torch.distributed.get_rank()
-        world_size = torch.distributed.get_world_size()
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
         dim_size = grad_output.shape[-1]
         dim_size_per_partition = dim_size // world_size
         grad_chunks = torch.split(grad_output, dim_size_per_partition, dim=-1)
@@ -41,8 +41,8 @@ class Gather(torch.autograd.Function):
 class Scatter(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
-        rank = torch.distributed.get_rank()
-        world_size = torch.distributed.get_world_size()
+        rank = dist.get_rank()
+        world_size = dist.get_world_size()
         last_dim_size = input.shape[-1]
         n_chunks = last_dim_size // world_size
         input_chunks = torch.split(input, n_chunks, dim=-1)
@@ -50,7 +50,7 @@ class Scatter(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        world_size = torch.distributed.get_world_size()
+        world_size = dist.get_world_size()
         grad_outputs = [torch.empty_like(grad_output) for _ in range(world_size)]
         dist.all_gather(grad_outputs, grad_output)
         grad_outputs = torch.cat(grad_outputs, dim=-1)
@@ -60,10 +60,10 @@ class Scatter(torch.autograd.Function):
 class Reduce(torch.autograd.Function):
     @staticmethod
     def forward(ctx, input):
-        world_size = torch.distributed.get_world_size()
+        world_size = dist.get_world_size()
         if world_size == 1:
             return input
-        torch.distributed.all_reduce(input)
+        dist.all_reduce(input)
         return input
 
     @staticmethod
@@ -74,7 +74,7 @@ class Reduce(torch.autograd.Function):
 class ColumnParallelLinear(torch.nn.Module):
     def __init__(self, input_size, output_size):
         super().__init__()
-        world_size = torch.distributed.get_world_size()
+        world_size = dist.get_world_size()
         self.input_size = input_size
         self.output_size = output_size
         self.output_size_per_partition = output_size // world_size
@@ -97,7 +97,7 @@ class ColumnParallelLinear(torch.nn.Module):
 class RowParallelLinear(nn.Module):
     def __init__(self, input_size, output_size):
         super().__init__()
-        world_size = torch.distributed.get_world_size()
+        world_size = dist.get_world_size()
         input_size_per_partition = input_size // world_size
 
         self.weight = nn.Parameter(torch.randn(
