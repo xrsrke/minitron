@@ -38,9 +38,9 @@ def run_parallel_column_parallel_linear(
     parallel_output = model(input.detach().requires_grad_(False))
     parallel_output.sum(dim=-1).backward()
 
-    assert torch.allclose(parallel_output, non_parallel_output, rtol=1e-3)
-    assert torch.allclose(model.weight.grad, weight_grad[rank], rtol=1e-3)
-    assert torch.allclose(model.bias.grad, bias_grad[rank], rtol=1e-3)
+    assert torch.allclose(parallel_output, non_parallel_output)
+    assert torch.allclose(model.weight.grad, weight_grad[rank])
+    assert torch.allclose(model.bias.grad, bias_grad[rank])
 
     dist.destroy_process_group()
 
@@ -127,7 +127,7 @@ def run_parallel_mlp(
     outputs_parallel = model(inputs)
     outputs_parallel.sum().backward()
 
-    assert torch.allclose(outputs_parallel, outputs, rtol=0.01)
+    assert torch.allclose(outputs_parallel, outputs)
 
     for layer_idx, grad_idx in [[0, 0], [2, 1]]:
         if layer_idx == 0:
